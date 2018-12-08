@@ -207,22 +207,23 @@ class SSTBulkDownloader:
         print(date)
         print(f"Downloading: {target_url}")
         print(f"Destination: {dest}")
-        if _validate(dest, target_url):
-            print("File already downloaded. Skipping\n")
-            return
-        try:
-            self.total_bytes += _dl_file(target_url, dest)
-            print("")
-            self.files_downloaded += 1
-        except Exception:
-            print("")
-            print("Encountered error when attempting to download file:")
-            print(f"File: {target_url}")
-            traceback.print_exc()
+        with requests.get(target_url, stream=True) as r:
+            if _validate(r, dest):
+                print("File already downloaded. Skipping\n")
+                return
+            try:
+                self.total_bytes += _dl_file(r, dest)
+                print("")
+                self.files_downloaded += 1
+            except Exception:
+                print("")
+                print("Encountered error when attempting to download file:")
+                print(f"File: {target_url}")
+                traceback.print_exc()
 
 
-def _validate(dest, url):
-    """Check if the local copy of the file at `url` is valid.
+def _validate(req, dest):
+    """Check if the local copy of the file pointed at by `req` is valid.
 
     Checks that file sizes match. If the remote file size can't be determined,
     this func plays it safe and claims the local copy isn't valid
@@ -231,23 +232,22 @@ def _validate(dest, url):
         return False
     local_size = os.path.getsize(dest)
     remote_size = -1
-    with requests.head(url) as r:
-        # Header may not contain size
-        try:
-            remote_size = int(r.headers["Content-Length"])
-        except KeyError:
-            pass
+    # Header may not contain size
+    try:
+        remote_size = int(req.headers["Content-Length"])
+    except KeyError:
+        pass
     # Err on the side of caution and dl the file if remote size couldn't be
     # determined.
     return local_size == remote_size
 
 
-def _dl_file(url, dest):
+def _dl_file(req, dest):
     bytes_ = 0
-    with open(dest, "wb") as fd, requests.get(url, stream=True) as r:
+    with open(dest, "wb") as fd:
         size = -1
         try:
-            size = int(r.headers["Content-Length"])
+            size = int(req.headers["Content-Length"])
         except KeyError:
             pass
         size_str = _get_size_str(size)
@@ -255,7 +255,7 @@ def _dl_file(url, dest):
             raise IOError(f"File too large: {size}")
         print(f"Downloading: {size_str}")
         prog = _ProgressIndicator(0, size)
-        for chunk in r.iter_content(chunk_size=1024 * 1024):
+        for chunk in req.iter_content(chunk_size=1024 * 1024):
             if chunk:
                 bytes_ += len(chunk)
                 fd.write(chunk)
@@ -308,6 +308,9 @@ if __name__ == "__main__":
         print(f"Creating data dir: {args.data_dir}")
         os.makedirs(args.data_dir)
     dloader = SSTBulkDownloader(
-        BASE_URL, args.data_dir, target_cache_dir=args.cache_dir
+        BASE_URL,
+        args.data_dir,
+        time_buffer=0.001,
+        target_cache_dir=args.cache_dir,
     )
     dloader.run(not args.clear_cache)
