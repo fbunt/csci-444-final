@@ -163,6 +163,7 @@ class SSTBulkDownloader:
         self._get_targets_info(use_cache)
         self._dl_targets()
         print(f"Files downloaded: {self.files_downloaded}/{self.total_files}")
+        print(f"Files touched: {self.files_touched}/{self.total_files}")
         print("Total data: {}".format(_get_size_str(self.total_bytes)))
 
     def _get_targets_info(self, use_cache):
