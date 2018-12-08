@@ -2,6 +2,7 @@
 import argparse
 from bs4 import BeautifulSoup as BSoup, SoupStrainer
 import os
+import pendulum as pdm
 import pickle
 import re
 import requests
@@ -15,6 +16,10 @@ BASE_URL = (
 )
 
 YEAR_RE = re.compile("\\d{4}/")
+# Picks out the date in the file name
+FILE_DATE_RE = re.compile(
+    "SEAFLUX-OSB-CDR_V02R00_SST_D(\\d{4})(\\d{2})(\\d{2})_C\\d{8}.nc"
+)
 
 
 def _is_year(s):
@@ -182,30 +187,38 @@ class SSTBulkDownloader:
 
     def _dl_targets(self):
         print("\nStarting downloads\n")
+        fnum = 0
         for y in self._years:
             print(f"Downloading year: {y}")
             dest_dir = os.path.join(self._dest_dir, y)
             os.makedirs(dest_dir, exist_ok=True)
             for target_url in self._targets[y]:
-                f = os.path.basename(target_url)
-                dest = os.path.join(dest_dir, f)
-                print(f"Downloading: {target_url}")
-                print(f"Destination: {dest}")
-                if _validate(dest, target_url):
-                    print("File already downloaded. Skipping\n")
-                    continue
-                try:
-                    self.total_bytes += _dl_file(target_url, dest)
-                    print("")
-                    self.files_downloaded += 1
-                except Exception:
-                    print("")
-                    print(
-                        "Encountered error when attempting to download file:"
-                    )
-                    print(f"File: {target_url}")
-                    traceback.print_exc()
+                fnum += 1
+                self._dl_target_file(dest_dir, target_url, fnum)
                 time.sleep(self._time_buffer)
+
+    def _dl_target_file(self, dest_dir, target_url, fnum):
+        f = os.path.basename(target_url)
+        dest = os.path.join(dest_dir, f)
+        # Assume file names already validated
+        date_match = FILE_DATE_RE.match(f)
+        date = pdm.date(*[int(v) for v in date_match.groups()])
+        print(f"File {fnum}/{self.file_count}")
+        print(date)
+        print(f"Downloading: {target_url}")
+        print(f"Destination: {dest}")
+        if _validate(dest, target_url):
+            print("File already downloaded. Skipping\n")
+            return
+        try:
+            self.total_bytes += _dl_file(target_url, dest)
+            print("")
+            self.files_downloaded += 1
+        except Exception:
+            print("")
+            print("Encountered error when attempting to download file:")
+            print(f"File: {target_url}")
+            traceback.print_exc()
 
 
 def _validate(dest, url):
