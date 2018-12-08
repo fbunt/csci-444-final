@@ -155,13 +155,14 @@ class SSTBulkDownloader:
         self._years = []
         self._targets = None
         self.total_bytes = 0
-        self.file_count = 0
+        self.total_files = 0
         self.files_downloaded = 0
+        self.files_touched = 0
 
     def run(self, use_cache=True):
         self._get_targets_info(use_cache)
         self._dl_targets()
-        print(f"Files downloaded: {self.files_downloaded}/{self.file_count}")
+        print(f"Files downloaded: {self.files_downloaded}/{self.total_files}")
         print("Total data: {}".format(_get_size_str(self.total_bytes)))
 
     def _get_targets_info(self, use_cache):
@@ -183,7 +184,7 @@ class SSTBulkDownloader:
         for k in self._targets:
             count += len(self._targets[k])
         print(f"Found {count} data files")
-        self.file_count = count
+        self.total_files = count
 
     def _dl_targets(self):
         print("\nStarting downloads\n")
@@ -203,64 +204,63 @@ class SSTBulkDownloader:
         # Assume file names already validated
         date_match = FILE_DATE_RE.match(f)
         date = pdm.date(*[int(v) for v in date_match.groups()])
-        print(f"File {fnum}/{self.file_count}")
+        print(f"File {fnum}/{self.total_files}")
         print(date)
         print(f"Downloading: {target_url}")
         print(f"Destination: {dest}")
+        if os.path.isfile(dest):
+            self.files_touched += 1
+            print("File already downloaded. Skipping\n")
+            return
         with requests.get(target_url, stream=True) as r:
-            if _validate(r, dest):
-                print("File already downloaded. Skipping\n")
-                return
             try:
                 self.total_bytes += _dl_file(r, dest)
                 print("")
                 self.files_downloaded += 1
+                self.files_touched += 1
             except Exception:
+                # This does not catch KeyboardInterupt
                 print("")
                 print("Encountered error when attempting to download file:")
                 print(f"File: {target_url}")
                 traceback.print_exc()
 
 
-def _validate(req, dest):
-    """Check if the local copy of the file pointed at by `req` is valid.
+def _dl_file(req, dest):
+    """Downloads the file pointed to by `req` to `dest`.
 
-    Checks that file sizes match. If the remote file size can't be determined,
-    this func plays it safe and claims the local copy isn't valid
+    The file is downloaded to a temporary file and then moved to the
+    destination if the download is successful. If the download fails or is
+    interrupted, the temporary file is removed. This makes validation easy.
     """
-    if not os.path.isfile(dest):
-        return False
-    local_size = os.path.getsize(dest)
-    remote_size = -1
-    # Header may not contain size
+    bytes_ = 0
+    tmp_dest = dest + "_tmp"
+    fd = open(tmp_dest, 'wb')
+    size = -1
     try:
-        remote_size = int(req.headers["Content-Length"])
+        size = int(req.headers["Content-Length"])
     except KeyError:
         pass
-    # Err on the side of caution and dl the file if remote size couldn't be
-    # determined.
-    return local_size == remote_size
-
-
-def _dl_file(req, dest):
-    bytes_ = 0
-    with open(dest, "wb") as fd:
-        size = -1
-        try:
-            size = int(req.headers["Content-Length"])
-        except KeyError:
-            pass
-        size_str = _get_size_str(size)
-        if not size_str:
-            raise IOError(f"File too large: {size}")
-        print(f"Downloading: {size_str}")
-        prog = _ProgressIndicator(0, size)
+    size_str = _get_size_str(size)
+    if not size_str:
+        raise IOError(f"File too large: {size}")
+    print(f"Downloading: {size_str}")
+    prog = _ProgressIndicator(0, size)
+    finished = False
+    try:
         for chunk in req.iter_content(chunk_size=1024 * 1024):
             if chunk:
                 bytes_ += len(chunk)
                 fd.write(chunk)
                 prog.update(bytes_)
-        print("\nDone")
+        finished = True
+    finally:
+        fd.close()
+        if finished:
+            os.rename(tmp_dest, dest)
+        else:
+            os.remove(tmp_dest)
+    print("\nDone")
     return bytes_
 
 
