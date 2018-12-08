@@ -235,7 +235,7 @@ def _dl_file(req, dest):
     """
     bytes_ = 0
     tmp_dest = dest + "_tmp"
-    fd = open(tmp_dest, 'wb')
+    fd = open(tmp_dest, "wb")
     size = -1
     try:
         size = int(req.headers["Content-Length"])
@@ -248,7 +248,7 @@ def _dl_file(req, dest):
     prog = _ProgressIndicator(0, size)
     finished = False
     try:
-        for chunk in req.iter_content(chunk_size=1024 * 1024):
+        for chunk in req.iter_content(chunk_size=(5 * 1024 * 1024)):
             if chunk:
                 bytes_ += len(chunk)
                 fd.write(chunk)
