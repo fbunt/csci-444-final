@@ -224,7 +224,7 @@ def _validate(dest, url):
             remote_size = int(r.headers["Content-Length"])
         except KeyError:
             pass
-    # Error on the side of caution and dl the file if remote size couldn't be
+    # Err on the side of caution and dl the file if remote size couldn't be
     # determined.
     return local_size == remote_size
 
