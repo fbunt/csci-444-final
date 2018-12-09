@@ -1,6 +1,8 @@
 import argparse
 import os
 import pendulum as pdm
+# Progress bar lib
+from tqdm import tqdm
 import xarray as xr
 
 from util import (
@@ -15,21 +17,18 @@ from util import (
 
 def extract_and_write_stats(year_dirs, fd):
     for yd in year_dirs:
-        print("Extracting extremes for {}".format(os.path.basename(yd)))
-        ds = xr.open_mfdataset(year_dir + "/*.nc")
+        print("Extracting stats for {}".format(os.path.basename(yd)))
+        ds = xr.open_mfdataset(os.path.join(yd, "*.nc"))
         time = ds[TIME_KEY]
         sst = ds[SST_KEY]
-        prog = ProgressIndicator(0, len(time), width=70)
-        prog.update(0)
-        for i, t in enumerate(time):
+        year = os.path.basename(yd)
+        for i, t in enumerate(tqdm(time)):
             pdt = xdt_to_dt(t)
             ssti = sst.sel(time=t)
             min_ = xextr(ssti.min())
             max_ = xextr(ssti.max())
             mean = xextr(ssti.mean())
             _write_line(fd, pdt, min_, max_, mean)
-            prog.update(i + 1)
-        prog.done()
 
 
 def _write_line(fd, *values):
@@ -59,5 +58,6 @@ def _get_parser():
 if __name__ == "__main__":
     args = _get_parser().parse_args()
     year_dirs = get_year_dirs(args.data_dir)
-    with open(args.out_file) as fd:
+    with open(args.out_file, "w") as fd:
+        _write_line(fd, "#UTC", "min", "max", "mean")
         extract_and_write_stats(year_dirs, fd)
