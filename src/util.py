@@ -5,7 +5,7 @@ import re
 from sys import stdout
 
 
-_YEAR_DIR_RE = re.compile(".*data/\\d{4}$")
+_YEAR_DIR_RE = re.compile(".*/\\d{4}$")
 
 
 def _is_year_dir(path):
@@ -13,7 +13,7 @@ def _is_year_dir(path):
 
 
 def get_year_dirs(datadir):
-    root = datadir.rstrip("/")
+    root = os.path.abspath(datadir)
     year_dirs = glob.glob(root + "/*")
     return [os.path.abspath(d) for d in filter(_is_year_dir, year_dirs)]
 
