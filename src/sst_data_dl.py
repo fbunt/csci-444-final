@@ -48,6 +48,15 @@ def _scrape_data_file_names(url):
     return dflinks
 
 
+def _validate_furl(url, year):
+    fname = os.path.basename(url)
+    date_match = FILE_DATE_RE.match(fname)
+    date = pdm.date(*[int(v) for v in date_match.groups()])
+    if date.year != int(year):
+        return False
+    return True
+
+
 def get_data_file_urls(base_url):
     years = _scrape_years(base_url)
     out = {}
@@ -55,6 +64,7 @@ def get_data_file_urls(base_url):
         url = urljoin(base_url, y + "/")
         file_names = _scrape_data_file_names(url)
         df_urls = [urljoin(url, fi) for fi in file_names]
+        df_urls = [url for url in df_urls if _validate_furl(url, y)]
         out[y] = df_urls
     return out
 
