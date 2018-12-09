@@ -1,13 +1,11 @@
 import argparse
 import os
-import pendulum as pdm
 # Progress bar lib
 from tqdm import tqdm
 import xarray as xr
 
 from util import (
     get_year_dirs,
-    ProgressIndicator,
     SST_KEY,
     TIME_KEY,
     xdt_to_dt,
@@ -21,7 +19,6 @@ def extract_and_write_stats(year_dirs, fd):
         ds = xr.open_mfdataset(os.path.join(yd, "*.nc"))
         time = ds[TIME_KEY]
         sst = ds[SST_KEY]
-        year = os.path.basename(yd)
         for i, t in enumerate(tqdm(time)):
             pdt = xdt_to_dt(t)
             ssti = sst.sel(time=t)
