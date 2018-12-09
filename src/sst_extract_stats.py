@@ -1,19 +1,18 @@
 import argparse
 import os
+import pendulum as pdm
+
 # Progress bar lib
 from tqdm import tqdm
 import xarray as xr
 
-from util import (
-    get_year_dirs,
-    SST_KEY,
-    TIME_KEY,
-    xdt_to_dt,
-    xextr,
-)
+from util import get_year_dirs, SST_KEY, TIME_KEY, xdt_to_dt, xextr
 
 
-def extract_and_write_stats(year_dirs, fd):
+_DELIM = ","
+
+
+def extract_and_write_stats(year_dirs, fd, skip_dates):
     for yd in year_dirs:
         print("Extracting stats for {}".format(os.path.basename(yd)))
         ds = xr.open_mfdataset(os.path.join(yd, "*.nc"))
@@ -21,6 +20,8 @@ def extract_and_write_stats(year_dirs, fd):
         sst = ds[SST_KEY]
         for i, t in enumerate(tqdm(time)):
             pdt = xdt_to_dt(t)
+            if pdt in skip_dates:
+                continue
             ssti = sst.sel(time=t)
             min_ = xextr(ssti.min())
             max_ = xextr(ssti.max())
@@ -30,8 +31,23 @@ def extract_and_write_stats(year_dirs, fd):
 
 def _write_line(fd, *values):
     # pendulum uses RFC 3339 when printed. I wish everything did... :(
-    line = ",".join(["{}".format(v) for v in values]) + "\n"
+    line = _DELIM.join(["{}".format(v) for v in values]) + "\n"
     fd.write(line)
+
+
+def _get_skip_dates(fd):
+    # Clear header
+    fd.readline()
+    # Using set for constant membership testing later
+    dates = set()
+    for i, line in enumerate(fd):
+        try:
+            date_str, *__ = line.split(_DELIM)
+            dates.add(pdm.parse(date_str))
+        except (ValueError, pdm.exceptions.ParserError):
+            print(f"Error parsing date at line {i}")
+            print(f'"{line}"')
+    return frozenset(dates)
 
 
 def _validate_data_dir(d):
@@ -53,8 +69,18 @@ def _get_parser():
 
 
 if __name__ == "__main__":
+    # WARNING: This program takes forever
     args = _get_parser().parse_args()
     year_dirs = get_year_dirs(args.data_dir)
-    with open(args.out_file, "w") as fd:
-        _write_line(fd, "#UTC", "min", "max", "mean")
-        extract_and_write_stats(year_dirs, fd)
+
+    # Try to recover already processed data. This can recover a LOT of time
+    fmode = "w" if not os.path.isfile(args.out_file) else "a"
+    skip_dates = set()
+    if fmode == "a":
+        with open(args.out_file) as fd:
+            skip_dates.update(_get_skip_dates(fd))
+
+    with open(args.out_file, fmode) as fd:
+        if fmode == "w":
+            _write_line(fd, "#UTC", "min", "max", "mean")
+        extract_and_write_stats(year_dirs, fd, skip_dates)
