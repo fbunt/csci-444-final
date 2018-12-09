@@ -3,14 +3,13 @@ import argparse
 from bs4 import BeautifulSoup as BSoup, SoupStrainer
 import os
 import pendulum as pdm
-import pickle
 import re
 import requests
 import time
 import traceback
 from urllib.request import urljoin, urlopen
 
-from util import ProgressIndicator
+from util import cache_data, FILE_DATE_RE, load_cached_data, ProgressIndicator
 
 
 BASE_URL = (
@@ -18,10 +17,6 @@ BASE_URL = (
 )
 
 YEAR_RE = re.compile("\\d{4}/")
-# Picks out the date in the file name
-FILE_DATE_RE = re.compile(
-    "SEAFLUX-OSB-CDR_V02R00_SST_D(\\d{4})(\\d{2})(\\d{2})_C\\d{8}.nc"
-)
 
 
 def _is_year(s):
@@ -68,35 +63,6 @@ CACHE_DIR = "../cache"
 LINKS_CACHE_FILE = "targets.p"
 
 
-def _cache_data(data, dest_path, force=False):
-    """Cache data to the specified destination using pickle.
-
-    Use force to overwrite.
-    """
-    dest_path = os.path.abspath(dest_path)
-    dest_dir = os.path.dirname(dest_path)
-    if not os.path.isdir(dest_dir):
-        print(f"Creating cache dir: {dest_dir}")
-        os.makedirs(dest_dir)
-    print(f"Caching data to {dest_path}")
-    if os.path.isfile(dest_path):
-        if not force:
-            print("Cache already exists. Aborting")
-        else:
-            print("Overwriting cached file")
-    with open(dest_path, "wb") as fd:
-        pickle.dump(data, fd, protocol=pickle.HIGHEST_PROTOCOL)
-
-
-def _load_cached_data(data_path):
-    data_path = os.path.abspath(data_path)
-    if not os.path.isfile(data_path):
-        print(f"No such cache file: {data_path}")
-        return None
-    with open(data_path, "rb") as fd:
-        return pickle.load(fd)
-
-
 class SSTBulkDownloader:
     """Class that performs a bulk download of NOAA SST data files."""
 
@@ -128,13 +94,13 @@ class SSTBulkDownloader:
         targets = None
         write_cache = True
         if use_cache:
-            targets = _load_cached_data(self._target_cache_path)
+            targets = load_cached_data(self._target_cache_path)
             if targets is None:
                 targets = get_data_file_urls(self._base_url)
                 write_cache = False
             else:
                 print("Targets loaded from cache")
-        _cache_data(targets, self._target_cache_path, force=write_cache)
+        cache_data(targets, self._target_cache_path, force=write_cache)
         self._targets = targets
         self._years = list(self._targets.keys())
         self._years.sort()

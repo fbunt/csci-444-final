@@ -1,11 +1,17 @@
+import argparse
 import glob
 import os
 import pendulum as pdm
+import pickle
 import re
 from sys import stdout
 
 
 _YEAR_DIR_RE = re.compile(".*/\\d{4}$")
+# Picks out the date in the file name
+FILE_DATE_RE = re.compile(
+    "SEAFLUX-OSB-CDR_V02R00_SST_D(\\d{4})(\\d{2})(\\d{2})_C\\d{8}.nc"
+)
 
 
 def _is_year_dir(path):
@@ -20,7 +26,7 @@ def get_year_dirs(datadir):
 
 def get_data_file_names(datadir):
     year_dirs = get_year_dirs(datadir)
-    years = [os.path.basename(d) for d in years_dirs]
+    years = [os.path.basename(d) for d in year_dirs]
     out = {}
     for i, y in years:
         yroot = year_dirs[i]
@@ -97,3 +103,43 @@ class ProgressIndicator:
 
     def done(self):
         print("")
+
+
+def cache_data(data, dest_path, force=False):
+    """Cache data to the specified destination using pickle.
+
+    Use force to overwrite.
+    """
+    dest_path = os.path.abspath(dest_path)
+    dest_dir = os.path.dirname(dest_path)
+    if not os.path.isdir(dest_dir):
+        print(f"Creating cache dir: {dest_dir}")
+        os.makedirs(dest_dir)
+    print(f"Caching data to {dest_path}")
+    if os.path.isfile(dest_path):
+        if not force:
+            print("Cache already exists. Aborting")
+        else:
+            print("Overwriting cached file")
+    with open(dest_path, "wb") as fd:
+        pickle.dump(data, fd, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def load_cached_data(data_path):
+    data_path = os.path.abspath(data_path)
+    if not os.path.isfile(data_path):
+        print(f"No such cache file: {data_path}")
+        return None
+    with open(data_path, "rb") as fd:
+        return pickle.load(fd)
+
+
+def get_data_dir_arg_parser():
+    p = argparse.ArgumentParser()
+    p.add_argument(
+        "-d",
+        "--data-dir",
+        default="../data",
+        help="Data directory",
+    )
+    return p
