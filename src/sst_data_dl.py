@@ -6,10 +6,12 @@ import pendulum as pdm
 import pickle
 import re
 import requests
-from sys import stdout
 import time
 import traceback
 from urllib.request import urljoin, urlopen
+
+from util import ProgressIndicator
+
 
 BASE_URL = (
     "https://www.ncei.noaa.gov/data/sea-surface-temperature-whoi/access/"
@@ -60,51 +62,6 @@ def get_data_file_urls(base_url):
         df_urls = [urljoin(url, fi) for fi in file_names]
         out[y] = df_urls
     return out
-
-
-class _ProgressIndicator:
-    """Prints out an indication of progress."""
-
-    def __init__(self, min_=0, max_=100, width=50, fill="#", unit="Bytes"):
-        """Return new ProgressIndicator.
-
-        If max > min then a progress bar will be displayed. Otherwise, the
-        update value will simply be printed.
-        """
-        self._fill = str(fill)
-        self._width = width
-        self._fmt = "\r[{:-<" + str(width) + "}] {:3.1%}"
-        self.min = min_
-        self.max = max_
-        self.range = self.max - self.min
-        self._unit = unit
-        self.value = 0.0
-        # Display progress bar
-        self._mode = "BAR"
-        if self.max <= self.min:
-            # Just display the update value
-            self._mode = "VALUE"
-
-    def _get_progress(self):
-        p = 0.0
-        if self.value >= self.min:
-            p = self.value / self.range
-        if p > 1.0:
-            p = 1.0
-        return p
-
-    def update(self, value):
-        # NOTE: will overwrite current line on screen. clear space for it
-        self.value = value
-        if self._mode == "BAR":
-            progress = self._get_progress()
-            nticks = int(progress * self._width)
-            stdout.write(self._fmt.format(self._fill * nticks, progress))
-        else:
-            # Overwrite last print
-            stdout.write("\r{:100}".format(" "))
-            stdout.write("\r{} {}".format(value, self._unit))
-        stdout.flush()
 
 
 CACHE_DIR = "../cache"
@@ -246,7 +203,7 @@ def _dl_file(req, dest):
     if not size_str:
         raise IOError(f"File too large: {size}")
     print(f"Downloading: {size_str}")
-    prog = _ProgressIndicator(0, size)
+    prog = ProgressIndicator(0, size)
     finished = False
     try:
         for chunk in req.iter_content(chunk_size=(5 * 1024 * 1024)):
@@ -261,7 +218,8 @@ def _dl_file(req, dest):
             os.rename(tmp_dest, dest)
         else:
             os.remove(tmp_dest)
-    print("\nDone")
+        prog.done()
+    print("Done")
     return bytes_
 
 
