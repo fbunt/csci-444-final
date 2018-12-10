@@ -36,6 +36,8 @@ def get_data_file_names(datadir):
     return out
 
 
+LAT_KEY = "lat"
+LON_KEY = "lon"
 TIME_KEY = "time"
 SST_KEY = "sea_surface_temperature"
 
