@@ -27,4 +27,4 @@ w=7i
 gmt grdimage $infile -Rg -JKs180/$w -B+t"$title" -Csst.cpt -P -K > $framefile
 gmt pscoast -Rg -JKs180/$w -Bafg -Dc -A5000 -Wthinnest -Gwhite -O -K >> $framefile
 gmt psscale -Rg -JKs180/$w -DjMR+w4i/0.5+v+o-1i/0i -Csst.cpt -Ba6f -O >> $framefile
-gmt psconvert $framefile -P -E500 -Tg -A1i -Z
+gmt psconvert $framefile -P -E300 -Tg -A1i -Z
