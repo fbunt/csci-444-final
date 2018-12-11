@@ -16,6 +16,9 @@ if [ ! -f "$infile" ]; then
     exit 1
 fi
 
+# Trim whitespace
+title=$(echo $title | xargs)
+
 framefile="$framedir/frame_$title.ps"
 
 if [ ! -f sst.cpt ]; then

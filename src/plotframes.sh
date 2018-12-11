@@ -28,7 +28,7 @@ base_name=${tmp%.*}
 
 prefix="$workdir/${base_name}_"
 
-# Split into time splices (1 slice per file)
+# Split into time slices (1 slice per file)
 cdo -s splitsel,1 "$infile" "$prefix"
 
 for i in {0..7}; do
@@ -39,8 +39,6 @@ for i in {0..7}; do
     # Collapse time dimension (remove it) by averaging along time dim
     ncwa -O -a time "$fname" "$fname_nt"
     tstamp=$(cdo -s showtimestamp "$fname_nt")
-    # trim whitespace
-    tstamp=$(echo $tstamp | xargs)
     bash $(dirname $0)/plotnc.sh -f "$framedir" -t "$tstamp" -i "$fname_nt"
     rm "$fname" "$fname_nt"
 done
