@@ -1,11 +1,15 @@
 #!/bin/bash
-while getopts w:f:d:j: opts; do
+resume=
+split=
+while getopts w:f:d:j:rs opts; do
     case ${opts} in
         # strip trailing slashes
         w) workdir=${OPTARG%/} ;;
         f) framedir=${OPTARG%/} ;;
         d) datadir=${OPTARG%/} ;;
         j) njobs=${OPTARG} ;;
+        r) resume="--resume" ;;
+        s) split="-s" ;;
     esac
 done
 
@@ -23,5 +27,5 @@ if [ ! -d "$datadir" ]; then
 fi
 
 
-ls $datadir/*/*.nc | parallel -I% --max-args 1 --progress -j$njobs --joblog par.log \
-    src/plotframes.sh -w $workdir -f $framedir -i % | tee -a my.log
+ls $datadir/*/*.nc | parallel -I% --max-args 1 --progress -j$njobs $resume --joblog par.log \
+    src/plotframes.sh -w $workdir -f $framedir -i % $split | tee -a my.log

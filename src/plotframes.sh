@@ -28,9 +28,9 @@ fi
 tmp=${infile##*/}
 base_name=${tmp%.*}
 
-if [ $split -eq 0 ]; then
-    prefix="$workdir/${base_name}"
+prefix="$workdir/${base_name}"
 
+if [ $split -eq 0 ]; then
     fname_nt="${prefix}_avg.nc"
     # Average over day
     ncwa -O -a time "$infile" "$fname_nt"
