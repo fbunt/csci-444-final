@@ -1,10 +1,12 @@
 #!/bin/bash
-while getopts w:f:i: opts; do
+split=0
+while getopts w:f:i:s opts; do
     case ${opts} in
         # strip trailing slashes
         w) workdir=${OPTARG%/} ;;
         f) framedir=${OPTARG%/} ;;
         i) infile=${OPTARG} ;;
+        s) split=1 ;;
     esac
 done
 
@@ -26,20 +28,29 @@ fi
 tmp=${infile##*/}
 base_name=${tmp%.*}
 
-prefix="$workdir/${base_name}_"
+if [ $split -eq 0 ]; then
+    prefix="$workdir/${base_name}"
 
-# Split into time slices (1 slice per file)
-cdo -s splitsel,1 "$infile" "$prefix"
-
-for i in {0..7}; do
-    fname="${prefix}00000${i}.nc"
-    # Final data file with no time dim
-    fname_nt="${fname%.nc}_nt.nc"
-    # GMT won't work with 3D data even if len(time) -> 1
-    # Collapse time dimension (remove it) by averaging along time dim
-    ncwa -O -a time "$fname" "$fname_nt"
+    fname_nt="${prefix}_avg.nc"
+    # Average over day
+    ncwa -O -a time "$infile" "$fname_nt"
     tstamp=$(cdo -s showtimestamp "$fname_nt")
     bash $(dirname $0)/plotnc.sh -f "$framedir" -t "$tstamp" -i "$fname_nt"
-    rm "$fname" "$fname_nt"
-done
+    rm "$fname_nt"
+else
+    # Split into time slices (1 slice per file)
+    cdo -s splitsel,1 "$infile" "$prefix"
+
+    for i in {0..7}; do
+        fname="${prefix}00000${i}.nc"
+        # Final data file with no time dim
+        fname_nt="${fname%.nc}_nt.nc"
+        # GMT won't work with 3D data even if len(time) -> 1
+        # Collapse time dimension (remove it) by averaging along time dim
+        ncwa -O -a time "$fname" "$fname_nt"
+        tstamp=$(cdo -s showtimestamp "$fname_nt")
+        bash $(dirname $0)/plotnc.sh -f "$framedir" -t "$tstamp" -i "$fname_nt"
+        rm "$fname" "$fname_nt"
+    done
+fi
 echo "DONE: $infile"
