@@ -1,2 +1,2 @@
 #!/bin/bash
-bash src/gen_frames_par.sh -w working -f plots/frames -d data -j 14
+bash src/gen_frames_par.sh -w working -f plots/frames -d data -j 14 -r
